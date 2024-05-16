@@ -1,0 +1,28 @@
+
+// src/components/Dashboard.js
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import useAuth from '../hooks/useAuth';
+
+const Dashboard = () => {
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  if (!user) {
+    navigate('/login');
+    return null;
+  }
+
+  return (
+    <div>
+      <h2>Dashboard</h2>
+      <p>Welcome to the dashboard!</p>
+    </div>
+  );
+};
+
+export default Dashboard;
