@@ -1,162 +1,135 @@
-// src/components/Dashboard.js
 import React, { useState, useEffect } from 'react';
-import {
-  collection,
-  getDocs,doc,
-  addDoc,
-  deleteDoc,
-  updateDoc,
-} from 'firebase/firestore';
+import { useNavigate } from 'react-router-dom';
+import { collection, addDoc,doc, getDocs, updateDoc, deleteDoc, query, where, onSnapshot } from 'firebase/firestore';
+import { Button, TextField, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper } from '@mui/material';
 import { db } from '../firebaseConfig'; // Replace with your path to firebaseConfig.js
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
-  Button,
-  TextField,
-  Dialog,
-  DialogContent,
-  DialogContentText,
-  DialogActions,
-  Snackbar,
-  Alert,
-} from '@mui/material';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
 
 const Dashboard = () => {
-  const [data, setData] = useState([]); // Array to store fetched data
-  const [openCreateDialog, setOpenCreateDialog] = useState(false);
-  const [openEditDialog, setOpenEditDialog] = useState(false);
-  const [selectedDataItem, setSelectedDataItem] = useState({}); // For editing
-  const [snackbarOpen, setSnackbarOpen] = useState(false);
-  const [snackbarMessage, setSnackbarMessage] = useState('');
-  const [snackbarSeverity, setSnackbarSeverity] = useState('success');
+    const navigate = useNavigate();
+    const [users, setUsers] = useState([]);
+    const [name, setName] = useState('');
+    const [age, setAge] = useState('');
+    const [searchName, setSearchName] = useState('');
 
-  // Fetch data on component mount (replace 'yourCollectionPath' with your actual collection)
-  useEffect(() => {
-    const getData = async () => {
-      try {
-        const dataRef = collection(db, 'users');
-        const querySnapshot = await getDocs(dataRef);
-        const fetchedData = querySnapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
-        setData(fetchedData);
-      } catch (error) {
-        console.error('Error fetching data:', error);
-        setSnackbarOpen(true);
-        setSnackbarMessage('Error fetching data. Please try again.');
-        setSnackbarSeverity('error');
+    useEffect(() => {
+      const fetchUsers = async () => {
+        const q = query(collection(db, 'users'), where('name', '>=', searchName), where('name', '<=', searchName + '\uf8ff'));
+        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+          const usersData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          setUsers(usersData);
+        });
+  
+        return unsubscribe;
+      };
+  
+      fetchUsers();
+    }, [searchName]);
+  
+    const handleAddUser = async () => {
+      if (name.trim() !== '' && age.trim() !== '') {
+        try {
+          await addDoc(collection(db, 'users'), {
+            name: name,
+            age: age
+          });
+          setName('');
+          setAge('');
+        } catch (error) {
+          console.error('Error adding document: ', error);
+        }
       }
     };
-    getData();
-  }, []);
-
-  // Functions for CRUD operations (replace placeholders with your data structure and logic)
-  const handleCreate = async (newData) => {
-    try {
-      const docRef = await addDoc(collection(db, 'users'), newData);
-      console.log('Document written with ID:', docRef.id);
-      setData([...data, { id: docRef.id, ...newData }]); // Update state with new data
-      setOpenCreateDialog(false);
-      setSnackbarOpen(true);
-      setSnackbarMessage('Item created successfully.');
-      setSnackbarSeverity('success');
-    } catch (error) {
-      console.error('Error adding document:', error);
-      setSnackbarOpen(true);
-      setSnackbarMessage('Error creating item. Please try again.');
-      setSnackbarSeverity('error');
-    }
+  
+    const handleUpdateUser = async (id) => {
+        const userToUpdate = users.find(user => user.id === id);
+        if (userToUpdate) {
+          try {
+            await updateDoc(doc(db, 'users', id), {
+              name: name || userToUpdate.name,
+              age: age || userToUpdate.age
+            });
+            setName('');
+            setAge('');
+          } catch (error) {
+            console.error('Error updating document: ', error);
+          }
+        }
+      };
+  
+    const handleDeleteUser = async (id) => {
+      try {
+        await deleteDoc(doc(db, 'users', id));
+      } catch (error) {
+        console.error('Error deleting document: ', error);
+      }
+    };
+  
+    return (
+      <div>
+        <h2>Dashboard</h2>
+        <div>
+          <TextField
+            label="Search by Name"
+            variant="outlined"
+            value={searchName}
+            onChange={(e) => setSearchName(e.target.value)}
+          />
+        </div>
+        <div style={{ marginBottom: '20px' }}>
+          <TextField
+            label="Name"
+            variant="outlined"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            style={{ marginRight: '10px' }}
+          />
+          <TextField
+            label="Age"
+            variant="outlined"
+            value={age}
+            onChange={(e) => setAge(e.target.value)}
+            style={{ marginRight: '10px' }}
+          />
+          <Button variant="contained" onClick={handleAddUser}>Add User</Button>
+        </div>
+        <TableContainer component={Paper}>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Name</TableCell>
+                <TableCell>Age</TableCell>
+                <TableCell>Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+            {users.map(user => (
+                <TableRow key={user.id}>
+                  <TableCell>
+                    <TextField
+                      value={name || user.name}
+                      onChange={(e) => setName(e.target.value)}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <TextField
+                      value={age || user.age}
+                      onChange={(e) => setAge(e.target.value)}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Button variant="contained" startIcon={<EditIcon />} onClick={() => handleUpdateUser(user.id)}>Edit</Button>
+                    <Button variant="contained" startIcon={<DeleteIcon />} onClick={() => handleDeleteUser(user.id)}>Delete</Button>
+                  
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </div>
+    );
   };
-
-  const handleEdit = async (updatedData) => {
-    try {
-      const { id, ...rest } = updatedData; // Destructure data for update
-      await updateDoc(doc(db, 'users', id), rest);
-      console.log('Document updated successfully');
-      const updatedDataArray = data.map((item) => (item.id === id ? { ...item, ...updatedData } : item));
-      setData(updatedDataArray); // Update state with modified data
-      setOpenEditDialog(false);
-      setSnackbarOpen(true);
-      setSnackbarMessage('Item updated successfully.');
-      setSnackbarSeverity('success');
-    } catch (error) {
-      console.error('Error updating document:', error);
-      setSnackbarOpen(true);
-      setSnackbarMessage('Error updating item. Please try again.');
-      setSnackbarSeverity('error');
-    }
-  };
-
-  const handleDelete = async (id) => {
-    try {
-      await deleteDoc(doc(db, 'users', id));
-      console.log('Document deleted successfully');
-      const updatedDataArray = data.filter((item) => item.id !== id);
-      setData(updatedDataArray); // Update state with deleted item removed
-      setSnackbarOpen(true);
-      setSnackbarMessage('Item deleted successfully.');
-      setSnackbarSeverity('success');
-    } catch (error) {
-      console.error('Error deleting document:', error);
-      setSnackbarOpen(true);
-      setSnackbarMessage('Error deleting item. Please try again.');
-      setSnackbarSeverity('error');
-    }
-  };  const CreateDialog = () => (
-    <Dialog open={openCreateDialog} onClose={() => setOpenCreateDialog(false)}>
-      <DialogContent>
-        <DialogContentText>Create New Item</DialogContentText>
-        {/* Form fields for new data creation */}
-        <TextField
-          autoFocus
-          margin="dense"
-          label="Field 1"
-          type="text"
-          fullWidth
-          onChange={(e) => {
-            // Update new item state based on form field changes
-            const newData = { ...newData, field1: e.target.value };
-            setNewData(newData);
-          }}
-        />
-        {/* ... other form fields as needed, following the same pattern for onChange */}
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={() => setOpenCreateDialog(false)}>Cancel</Button>
-        <Button onClick={() => handleCreate(newData)}>Create</Button>
-      </DialogActions>
-    </Dialog>
-  );
-
-  const [newData, setNewData] = useState({}); // State for new item data in CreateDialog
-
-  const EditDialog = () => (
-    <Dialog open={openEditDialog} onClose={() => setOpenEditDialog(false)}>
-      <DialogContent>
-        <DialogContentText>Edit Item</DialogContentText>
-        {/* Form fields for editing data, pre-populated with selected item data */}
-        <TextField
-          autoFocus
-          margin="dense"
-          label="Field 1"
-          type="text"
-          fullWidth
-          defaultValue={selectedDataItem.field1} // Replace with actual field names
-          onChange={(e) => {
-            // Update selected item data state based on form field changes
-            setSelectedDataItem({ ...selectedDataItem, field1: e.target.value });
-          }}
-        />
-        {/* ... other form fields as needed, following the same pattern for defaultValue and onChange */}
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={() => setOpenEditDialog(false)}>Cancel</Button>
-        <Button onClick={() => handleEdit(selectedDataItem)}>Save</Button>
-      </DialogActions>
-    </Dialog>
-  );
-
-  // ... other parts of your Dashboard component
-};
-export default Dashboard;
+  
+  export default Dashboard;
